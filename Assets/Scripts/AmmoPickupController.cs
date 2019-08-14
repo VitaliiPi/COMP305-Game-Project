@@ -1,5 +1,11 @@
 ﻿using UnityEngine;
 
+/*
+
+AMMO PICKUP CONTROLLER
+======================
+
+*/
 
 public class AmmoPickupController : MonoBehaviour {
 

@@ -1,31 +1,51 @@
 ﻿using UnityEngine;
 
+/*
+
+PLAYER CONTROLLER
+=================
+
+Control player object movement, animations, physics and collisions.
+
+*/
 
 public class PlayerController : MonoBehaviour {
 
-    private Transform pTransform;
+	// ==========================================
+	// Attributes
+	// ==========================================
+
+	// References to player components
+	private Transform pTransform;
 	private Rigidbody2D pRigidbody;
 	
+	// Vector components for horizontal/vertical movement
 	private float move;
 	private float jump;
 
+	// Positioning/gameflow flags
 	private bool isFacingRight;
 	private bool isGrounded;
 	private bool playerWon;
 
+	// Animation components
 	private Animator animator;
 
+	// Reference to the game controller
 	public GameController gameController;
 
+	// Movement parameters
 	public float velocity = 20f;
 	public float jumpForce = 400f;
 
+	// This spawn point is updated after reaching checkpoints
 	public Transform SpawnPoint;
 	public Camera gameCamera;
 
+	// Bullets
 	public Transform bullet;
 	public float bulletDistance = .3f;
-	public float timeBetweenFires = .3f; 
+	public float timeBetweenFires = .3f; // "Cooloff" time
 	private float timeTilNextFire = 0.0f;
 
 	[Header("SoundClips")]
@@ -33,17 +53,21 @@ public class PlayerController : MonoBehaviour {
 	public AudioClip landSound;
 	public AudioClip fireSound;
 	public AudioClip emptySound;
-	public AudioClip cockSound;
+	public AudioClip reloadSound;
 	public AudioClip deadSound;
 	public AudioClip winSound;
 	private AudioSource audioSource;
 
+	// ==========================================
+	// Object initialization
+	// ==========================================
 	void Start () {
-
-        this.initialize();
+		this.initialize();
 	}
 
-
+	// ==========================================
+	// Game Lifecycle Updates
+	// ==========================================
 	void Update() {
 			if (Input.GetKeyDown(KeyCode.Space) && !playerWon) {
 				this.jump = 1f;
@@ -55,6 +79,7 @@ public class PlayerController : MonoBehaviour {
 
 		if (!playerWon){
 
+			// Process ground movement
 			if (this.isGrounded) {
 				this.move = Input.GetAxis("Horizontal");
 				if (this.move > 0f) {
@@ -72,25 +97,30 @@ public class PlayerController : MonoBehaviour {
 					this.animator.SetInteger("HeroState", 0);
 				}
 
+				// Process weapon firing
 				if (Input.GetAxis ("Fire1") == 1) this.fire();
 				timeTilNextFire -= Time.deltaTime;
 
+				// Add movement to player's body
 				this.pRigidbody.AddForce(new Vector2(
 					this.move * this.velocity, 
 					this.jump * this.jumpForce),
 					ForceMode2D.Force);
 			}
 			else {
+				// Player is airbourne, apply zero extra force and let gravity act.
 				this.move = 0f;
 				this.jump = 0f;
 			}
 
+			// Follow player with the camera
 			this.gameCamera.transform.position = new Vector3(
 				this.pTransform.position.x,
 				this.pTransform.position.y,
 				-10f);
 
 		} else {
+			// Player won, levitate it to infinity and end the game.
 			this.pRigidbody.AddForce(new Vector2(0f, 
 					1f * (this.jumpForce / 8f)),
 					ForceMode2D.Force);
@@ -99,6 +129,10 @@ public class PlayerController : MonoBehaviour {
 
 	}
 
+	// Auxiliary methods
+	// ==========================================	
+
+	// Player initialization
 	private void initialize(){
 		this.pTransform = GetComponent<Transform>();
 		this.pRigidbody = GetComponent<Rigidbody2D>();
@@ -110,6 +144,7 @@ public class PlayerController : MonoBehaviour {
 		this.playerWon = false;
 	}
 
+	// Flip sprite when changing direction
 	private void flipHorizontal() {
 		if (this.isFacingRight) {
 			this.pTransform.localScale = new Vector2(1f,1f);
@@ -119,16 +154,20 @@ public class PlayerController : MonoBehaviour {
 		}
 	}
 
+	// Fire bullets
 	private void fire(){
 		if (timeTilNextFire <= 0) {
 			if (gameController.playerAmmo == 0) {
 				audioSource.PlayOneShot(this.emptySound);
 			} else {
+				// Determine the position for the fired bullet instance
 				Vector3 bulletPos = this.pTransform.position;
 
+				// Calculate the position of the bullet in front of the player
 				bulletPos.x = bulletPos.x + (bulletDistance * this.pTransform.localScale.x);
 				bulletPos.y += 0.16f;
 
+				// Create the bullet instance and trigger sounds/game updates
 				bullet.transform.localScale = this.pTransform.localScale;
 				Instantiate (bullet, bulletPos, this.pTransform.rotation);
 				this.animator.SetInteger("HeroState", 10);
@@ -139,6 +178,10 @@ public class PlayerController : MonoBehaviour {
 		}
 	}
 
+	// Collision detection methods
+	// =================================================
+
+	// Process physical collisions (w/ platforms, enemies)
 	private void OnCollisionEnter2D(Collision2D other) {
 		if (other.gameObject.CompareTag("DeathPlane") || other.gameObject.CompareTag("Enemy")) {
 			audioSource.PlayOneShot(this.deadSound);
@@ -170,19 +213,31 @@ public class PlayerController : MonoBehaviour {
 		this.animator.SetInteger("HeroState", 2);
 	}
 
+	// Process triggers (for pickups)
 	private void OnTriggerEnter2D(Collider2D other) {
 
 		if (other.gameObject.CompareTag("AmmoPickup")) {
 			other.gameObject.SendMessage("DestroyPickup");
 			gameController.updateAmmoCount(+6);
 			gameController.updateScore(+50);
-			audioSource.PlayOneShot(this.cockSound);
+			audioSource.PlayOneShot(this.reloadSound);
+		}
+
+		if (other.gameObject.CompareTag("Gem")) {
+			other.gameObject.SendMessage("DestroyPickup");
+			audioSource.PlayOneShot(this.winSound);
+			gameController.updateScore(+3000);
+			this.playerWon = true;
 		}
 
 	}
 
+	// Public methods
+	// ==========================================	
 
-    public void Displace(Vector3 displacement) {
+	// This method is used by moving platforms
+	// to displace the player together with them as they move
+	public void Displace(Vector3 displacement) {
 		this.pTransform.position += displacement;
 	}
 }
