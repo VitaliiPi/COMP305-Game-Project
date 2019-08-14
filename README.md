@@ -4,4 +4,4 @@
 1.0a – Alpha – Finished
 
 
-1.0b - Beta - Under Development
+1.0b - Beta - Released
